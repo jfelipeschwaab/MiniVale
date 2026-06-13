@@ -46,5 +46,23 @@ public class Transacao {
         this.dataHora = Instant.now();
     }
 
+    public Long getId() {
+        return id;
+    }
 
+    public Conta getContaOrigem() {
+        return contaOrigem;
+    }
+
+    public Conta getContaDestino() {
+        return contaDestino;
+    }
+
+    public BigDecimal getValor() {
+        return valor;
+    }
+
+    public Instant getDataHora() {
+        return dataHora;
+    }
 }
