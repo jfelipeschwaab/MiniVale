@@ -7,9 +7,18 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.util.Collection;
+import java.util.List;
+
 @Entity
 @Table(name = "usuarios")
-public class Usuario {
+public class Usuario implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -21,13 +30,28 @@ public class Usuario {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @Column
+    private String senha;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
+
+
+
     protected Usuario() {
 
     }
 
     public Usuario(String nome, String email) {
+        this(nome, email, null, Role.USER);
+    }
+
+    public Usuario(String nome, String email, String senha, Role role) {
         this.nome = nome;
         this.email = email;
+        this.senha = senha;
+        this.role = role;
     }
 
     public Long getId() {
@@ -41,5 +65,34 @@ public class Usuario {
     public String getEmail() {
         return email;
     }
+
+    public Role getRole() { return role;}
+
+    @Override
+    public String getPassword() {
+        return senha;
+    }
+
+    @Override
+    public String getUsername() {
+        return email;
+    }
+
+    @Override
+    public Collection<? extends  GrantedAuthority> getAuthorities() {
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+    }
+
+    @Override
+    public boolean isAccountNonExpired() { return true; }
+
+    @Override
+    public boolean isAccountNonLocked() { return true; }
+
+    @Override
+    public boolean isCredentialsNonExpired() { return true; }
+
+    @Override
+    public boolean isEnabled() { return true; }
 
 }
