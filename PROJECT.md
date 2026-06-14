@@ -30,7 +30,7 @@ Esse domínio é proposital: força BigDecimal, concorrência, idempotência e c
 
 ---
 
-## Fase 1 — Monólito: núcleo da carteira
+## Fase 1 — Monólito: núcleo da carteira ✅ CONCLUÍDA
 
 **Objetivo:** ter uma API funcional de conta, saldo e transferência, com persistência e transações corretas.
 
@@ -53,10 +53,10 @@ Esse domínio é proposital: força BigDecimal, concorrência, idempotência e c
 - Saldo como append-only ledger (registro imutável de movimentações)
 
 **Critério de pronto:**
-- Transferência entre duas contas debita uma e credita outra de forma atômica
-- Saldo nunca fica negativo (validação de domínio)
-- Tentativa de transferência inválida retorna status code e corpo de erro corretos
-- Cobertura de testes unitários do serviço de transferência (JUnit 5 + Mockito)
+- [x] Transferência entre duas contas debita uma e credita outra de forma atômica
+- [x] Saldo nunca fica negativo (validação de domínio)
+- [x] Tentativa de transferência inválida retorna status code e corpo de erro corretos
+- [x] Cobertura de testes unitários do serviço de transferência (JUnit 5 + Mockito)
 
 ---
 
