@@ -1,2 +1,2 @@
-INSERT INTO usuarios (nome, email) VALUES ('Ana Silva', 'ana.silva@email.com');
-INSERT INTO usuarios (nome, email) VALUES ('Bruno Costa', 'bruno.costa@email.com');
+INSERT INTO usuarios (nome, email, senha, role) VALUES ('Ana Silva', 'ana.silva@email.com', '$2a$10$XGzu2YdDV7ww8iGDwOJAeuGEOgjDtXZFCNEbJvgCJ8cBO5foR3fea', 'ADMIN');
+INSERT INTO usuarios (nome, email, senha, role) VALUES ('Bruno Costa', 'bruno.costa@email.com', '$2a$10$XGzu2YdDV7ww8iGDwOJAeuGEOgjDtXZFCNEbJvgCJ8cBO5foR3fea', 'USER');

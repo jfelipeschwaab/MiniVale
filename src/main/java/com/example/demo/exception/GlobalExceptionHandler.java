@@ -8,6 +8,8 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.security.authentication.BadCredentialsException;
+
 
 import java.util.HashMap;
 import java.util.Map;
@@ -40,6 +42,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UsuarioJaPossuiContaException.class)
     public ProblemDetail handleUsuarioJaPossuiConta(UsuarioJaPossuiContaException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ProblemDetail handleBadCredentials(BadCredentialsException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "Email ou senha inválidos");
+    }
+
+    @ExceptionHandler(TokenInvalidoException.class)
+    public ProblemDetail handleTokenInvalido(TokenInvalidoException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage());
     }
 
     @ExceptionHandler(OptimisticLockingFailureException.class)
