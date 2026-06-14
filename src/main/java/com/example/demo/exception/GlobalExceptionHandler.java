@@ -79,5 +79,9 @@ public class GlobalExceptionHandler {
         return problemDetail;
     }
 
+    @ExceptionHandler(OtpInvalidoException.class)
+    public ProblemDetail handleOtpInvalido(OtpInvalidoException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage());
+    }
 
 }

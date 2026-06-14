@@ -8,6 +8,7 @@ import com.example.demo.entity.Conta;
 import com.example.demo.service.ContaService;
 import jakarta.validation.Valid;
 import org.apache.coyote.Response;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,6 +16,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.example.demo.dto.TransferenciaPendenteResponse;
+import com.example.demo.dto.ConfirmarOtpRequest;
 
 import java.net.URI;
 import java.util.List;
@@ -55,13 +58,20 @@ public class ContaController {
     }
 
     @PostMapping("/transferencias")
-    public ResponseEntity<Void> transferir(
-            @Valid
-            @RequestBody
-            TransferenciaRequest request
+    public ResponseEntity<TransferenciaPendenteResponse> criarTransferenciaPendente(
+            @Valid @RequestBody TransferenciaRequest request
     ) {
-        contaService.transferir(request);
-        return ResponseEntity.noContent().build();
+        TransferenciaPendenteResponse pendente = contaService.criarTransferenciaPendente(request);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(pendente);
+    }
+
+    @PostMapping("/transferencias/{id}/confirmar")
+    public ResponseEntity<TransacaoResponse> confirmarTransferencia(
+            @PathVariable Long id,
+            @Valid @RequestBody ConfirmarOtpRequest request
+    ) {
+        TransacaoResponse transacao = contaService.confirmarTransferencia(id, request);
+        return ResponseEntity.ok(transacao);
     }
 }
 
