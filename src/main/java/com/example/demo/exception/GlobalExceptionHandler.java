@@ -37,6 +37,11 @@ public class GlobalExceptionHandler {
     }
 
 
+    @ExceptionHandler(UsuarioJaPossuiContaException.class)
+    public ProblemDetail handleUsuarioJaPossuiConta(UsuarioJaPossuiContaException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ProblemDetail handleOptimisticLock(OptimisticLockingFailureException exception) {
         return ProblemDetail.forStatusAndDetail(

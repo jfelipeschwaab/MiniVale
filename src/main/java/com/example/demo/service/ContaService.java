@@ -8,6 +8,7 @@ import com.example.demo.entity.Conta;
 import com.example.demo.entity.Transacao;
 import com.example.demo.entity.Usuario;
 import com.example.demo.exception.RecursoNaoEncontradoException;
+import com.example.demo.exception.UsuarioJaPossuiContaException;
 import com.example.demo.exception.TransferenciaInvalidaException;
 import com.example.demo.repository.ContaRepository;
 import com.example.demo.repository.TransacaoRepository;
@@ -40,6 +41,10 @@ public class ContaService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException(
                         "Usuário com id " + request.usuarioId() + " não encontrado"
                 ));
+
+        if (contaRepository.findByUsuarioId(request.usuarioId()).isPresent()) {
+            throw new UsuarioJaPossuiContaException(request.usuarioId());
+        }
 
         Conta conta = new Conta(usuario, request.saldoInicial());
         Conta contaSalva = contaRepository.save(conta);

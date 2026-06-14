@@ -10,6 +10,7 @@ import com.example.demo.entity.Usuario;
 import com.example.demo.exception.RecursoNaoEncontradoException;
 import com.example.demo.exception.SaldoInsuficienteException;
 import com.example.demo.exception.TransferenciaInvalidaException;
+import com.example.demo.exception.UsuarioJaPossuiContaException;
 import com.example.demo.repository.ContaRepository;
 import com.example.demo.repository.TransacaoRepository;
 import com.example.demo.repository.UsuarioRepository;
@@ -59,6 +60,7 @@ public class ContaServiceTest {
         ReflectionTestUtils.setField(contaSalva, "id", 10L);
 
         when(usuarioRepository.findById(usuarioId)).thenReturn(Optional.of(usuario));
+        when(contaRepository.findByUsuarioId(usuarioId)).thenReturn(Optional.empty());
         when(contaRepository.save(any(Conta.class))).thenReturn(contaSalva);
 
         //Act
@@ -85,6 +87,29 @@ public class ContaServiceTest {
         assertThatThrownBy(() -> contaService.criarConta(request))
                 .isInstanceOf(RecursoNaoEncontradoException.class)
                 .hasMessageContaining("99");
+
+        verify(contaRepository, never()).save(any());
+    }
+
+    @Test
+    void criarConta_deveLancarExcecao_quandoUsuarioJaPossuiConta() {
+        //Arrange
+        Long usuarioId = 1L;
+        Usuario usuario = new Usuario("Ana Silva", "ana.silva@gmail.com");
+        ReflectionTestUtils.setField(usuario, "id", usuarioId);
+
+        CriarContaRequest request = new CriarContaRequest(usuarioId, new BigDecimal("100.00"));
+
+        Conta contaExistente = new Conta(usuario, new BigDecimal("50.00"));
+        ReflectionTestUtils.setField(contaExistente, "id", 5L);
+
+        when(usuarioRepository.findById(usuarioId)).thenReturn(Optional.of(usuario));
+        when(contaRepository.findByUsuarioId(usuarioId)).thenReturn(Optional.of(contaExistente));
+
+        //Act + Assert
+        assertThatThrownBy(() -> contaService.criarConta(request))
+                .isInstanceOf(UsuarioJaPossuiContaException.class)
+                .hasMessageContaining("1");
 
         verify(contaRepository, never()).save(any());
     }
