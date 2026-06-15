@@ -22,7 +22,7 @@ public class CacheConfig {
 
         //Ao desserializar, só permitir classes que estejam no DTO
         PolymorphicTypeValidator typeValidator = BasicPolymorphicTypeValidator.builder()
-                .allowIfSubType("com.example.demo.dto")
+                .allowIfSubType("com.example.demo.dto.")
                 .build();
 
         //

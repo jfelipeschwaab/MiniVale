@@ -15,6 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.demo.entity.TransferenciaPendente;
 import com.example.demo.exception.OtpInvalidoException;
 import com.example.demo.repository.TransferenciaPendenteRepository;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.time.Instant;
 import java.util.List;
@@ -27,19 +30,22 @@ public class ContaService {
     private final TransacaoRepository transacaoRepository;
     private final TransferenciaPendenteRepository transferenciaPendenteRepository;
     private final OtpService otpService;
+    private final CacheManager cacheManager;
 
     public ContaService(
             ContaRepository contaRepository,
             UsuarioRepository usuarioRepository,
             TransacaoRepository transacaoRepository,
             TransferenciaPendenteRepository transferenciaPendenteRepository,
-            OtpService otpService
+            OtpService otpService,
+            CacheManager cacheManager
     ) {
         this.contaRepository = contaRepository;
         this.usuarioRepository = usuarioRepository;
         this.transacaoRepository = transacaoRepository;
         this.transferenciaPendenteRepository = transferenciaPendenteRepository;
         this.otpService = otpService;
+        this.cacheManager = cacheManager;
     }
 
     @Transactional
@@ -59,6 +65,7 @@ public class ContaService {
         return ContaResponse.fromEntity(contaSalva);
     }
 
+    @Cacheable(value = "saldo", key = "#contaId")
     @Transactional(readOnly = true)
     public ContaResponse consultarSaldo(Long contaId) {
         Conta conta = buscarContaOuFalhar(contaId);
@@ -140,7 +147,17 @@ public class ContaService {
         pendente.confirmar();
         transferenciaPendenteRepository.save(pendente);
 
+        evictCacheSaldo(contaOrigem.getId());
+        evictCacheSaldo(contaDestino.getId());
+
         return TransacaoResponse.fromEntity(transacao, contaOrigem.getId());
     }
 
+
+    private void evictCacheSaldo(Long contaId) {
+        Cache cacheSaldo = cacheManager.getCache("saldo");
+        if (cacheSaldo != null) {
+            cacheSaldo.evict(contaId);
+        }
+    }
 }
