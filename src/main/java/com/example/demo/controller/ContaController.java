@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.example.demo.dto.TransferenciaPendenteResponse;
 import com.example.demo.dto.ConfirmarOtpRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 import java.net.URI;
 import java.util.List;
@@ -45,18 +46,21 @@ public class ContaController {
             return ResponseEntity.created(location).body(contaCriada);
     }
 
+    @PreAuthorize("hasRole('ADMIN') or @contaSecurity.isOwner(#id, authentication)")
     @GetMapping("/{id}")
     public ResponseEntity<ContaResponse> consultarSaldo(@PathVariable Long id) {
         ContaResponse conta = contaService.consultarSaldo(id);
         return ResponseEntity.ok(conta);
     }
 
+    @PreAuthorize("hasRole('ADMIN') or @contaSecurity.isOwner(#id, authentication)")
     @GetMapping("/{id}/extrato")
     public ResponseEntity<List<TransacaoResponse>> listarExtrato(@PathVariable Long id) {
         List<TransacaoResponse> extrato = contaService.listarExtrato(id);
         return ResponseEntity.ok(extrato);
     }
 
+    @PreAuthorize("hasRole('ADMIN') or @contaSecurity.isOwner(#request.contaOrigemId(), authentication)")
     @PostMapping("/transferencias")
     public ResponseEntity<TransferenciaPendenteResponse> criarTransferenciaPendente(
             @Valid @RequestBody TransferenciaRequest request
@@ -65,6 +69,7 @@ public class ContaController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(pendente);
     }
 
+    @PreAuthorize("hasRole('ADMIN') or @contaSecurity.isOwnerOfTransferenciaPendente(#id, authentication)")
     @PostMapping("/transferencias/{id}/confirmar")
     public ResponseEntity<TransacaoResponse> confirmarTransferencia(
             @PathVariable Long id,

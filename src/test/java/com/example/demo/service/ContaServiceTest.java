@@ -1,18 +1,23 @@
 package com.example.demo.service;
 
+import com.example.demo.dto.ConfirmarOtpRequest;
 import com.example.demo.dto.ContaResponse;
 import com.example.demo.dto.CriarContaRequest;
 import com.example.demo.dto.TransacaoResponse;
+import com.example.demo.dto.TransferenciaPendenteResponse;
 import com.example.demo.dto.TransferenciaRequest;
 import com.example.demo.entity.Conta;
 import com.example.demo.entity.Transacao;
+import com.example.demo.entity.TransferenciaPendente;
 import com.example.demo.entity.Usuario;
+import com.example.demo.exception.OtpInvalidoException;
 import com.example.demo.exception.RecursoNaoEncontradoException;
 import com.example.demo.exception.SaldoInsuficienteException;
 import com.example.demo.exception.TransferenciaInvalidaException;
 import com.example.demo.exception.UsuarioJaPossuiContaException;
 import com.example.demo.repository.ContaRepository;
 import com.example.demo.repository.TransacaoRepository;
+import com.example.demo.repository.TransferenciaPendenteRepository;
 import com.example.demo.repository.UsuarioRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,6 +49,12 @@ public class ContaServiceTest {
 
     @Mock
     private TransacaoRepository transacaoRepository;
+
+    @Mock
+    private TransferenciaPendenteRepository transferenciaPendenteRepository;
+
+    @Mock
+    private OtpService otpService;
 
     @InjectMocks
     private ContaService contaService;
@@ -147,7 +159,7 @@ public class ContaServiceTest {
     }
 
     @Test
-    void transferir_deveTransferirComSucesso_quandoSaldoSuficiente() {
+    void criarTransferenciaPendente_deveCriarPendente_quandoContasExistemEDiferentes() {
         //Arrange
         Usuario usuarioOrigem = new Usuario("Ana Silva", "ana.silva@email.com");
         ReflectionTestUtils.setField(usuarioOrigem, "id", 1L);
@@ -160,56 +172,86 @@ public class ContaServiceTest {
         ReflectionTestUtils.setField(contaDestino, "id", 2L);
 
         TransferenciaRequest request = new TransferenciaRequest(1L, 2L, new BigDecimal("30.00"));
+        Instant expiraEm = Instant.now().plusSeconds(300);
 
         when(contaRepository.findById(1L)).thenReturn(Optional.of(contaOrigem));
         when(contaRepository.findById(2L)).thenReturn(Optional.of(contaDestino));
+        when(otpService.gerarCodigo()).thenReturn("123456");
+        when(otpService.hash("123456")).thenReturn("hash-123456");
+        when(otpService.calcularExpiracao()).thenReturn(expiraEm);
+        when(transferenciaPendenteRepository.save(any(TransferenciaPendente.class)))
+                .thenAnswer(invocation -> {
+                    TransferenciaPendente pendente = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(pendente, "id", 50L);
+                    return pendente;
+                });
 
         //Act
-        contaService.transferir(request);
+        TransferenciaPendenteResponse response = contaService.criarTransferenciaPendente(request);
 
         //Assert
-        assertThat(contaOrigem.getSaldo()).isEqualByComparingTo("70.00");
-        assertThat(contaDestino.getSaldo()).isEqualByComparingTo("30.00");
+        assertThat(response.id()).isEqualTo(50L);
+        assertThat(response.expiraEm()).isEqualTo(expiraEm);
+        assertThat(response.codigoOtpSimulado()).isEqualTo("123456");
 
-        verify(contaRepository).save(contaOrigem);
-        verify(contaRepository).save(contaDestino);
-        verify(transacaoRepository).save(any(Transacao.class));
+        verify(transferenciaPendenteRepository).save(any(TransferenciaPendente.class));
     }
 
     @Test
-    void transferir_deveLancarExcecao_quandoContaOrigemIgualContaDestino() {
+    void criarTransferenciaPendente_deveLancarExcecao_quandoContaOrigemIgualContaDestino() {
         //Arrange
         TransferenciaRequest request = new TransferenciaRequest(1L, 1L, new BigDecimal("30.00"));
 
         //Act + Assert
-        assertThatThrownBy(() -> contaService.transferir(request))
+        assertThatThrownBy(() -> contaService.criarTransferenciaPendente(request))
                 .isInstanceOf(TransferenciaInvalidaException.class);
 
         verify(contaRepository, never()).findById(any());
+        verify(transferenciaPendenteRepository, never()).save(any());
     }
 
     @Test
-    void transferir_deveLancarExcecao_quandoContaOrigemNaoExiste() {
+    void criarTransferenciaPendente_deveLancarExcecao_quandoContaOrigemNaoExiste() {
         //Arrange
         TransferenciaRequest request = new TransferenciaRequest(1L, 2L, new BigDecimal("30.00"));
 
         when(contaRepository.findById(1L)).thenReturn(Optional.empty());
 
         //Act + Assert
-        assertThatThrownBy(() -> contaService.transferir(request))
+        assertThatThrownBy(() -> contaService.criarTransferenciaPendente(request))
                 .isInstanceOf(RecursoNaoEncontradoException.class)
                 .hasMessageContaining("1");
 
-        verify(contaRepository, never()).save(any());
-        verify(transacaoRepository, never()).save(any());
+        verify(transferenciaPendenteRepository, never()).save(any());
     }
 
     @Test
-    void transferir_deveLancarExcecao_quandoSaldoInsuficiente() {
+    void criarTransferenciaPendente_deveLancarExcecao_quandoContaDestinoNaoExiste() {
         //Arrange
         Usuario usuarioOrigem = new Usuario("Ana Silva", "ana.silva@email.com");
         ReflectionTestUtils.setField(usuarioOrigem, "id", 1L);
-        Conta contaOrigem = new Conta(usuarioOrigem, new BigDecimal("10.00"));
+        Conta contaOrigem = new Conta(usuarioOrigem, new BigDecimal("100.00"));
+        ReflectionTestUtils.setField(contaOrigem, "id", 1L);
+
+        TransferenciaRequest request = new TransferenciaRequest(1L, 2L, new BigDecimal("30.00"));
+
+        when(contaRepository.findById(1L)).thenReturn(Optional.of(contaOrigem));
+        when(contaRepository.findById(2L)).thenReturn(Optional.empty());
+
+        //Act + Assert
+        assertThatThrownBy(() -> contaService.criarTransferenciaPendente(request))
+                .isInstanceOf(RecursoNaoEncontradoException.class)
+                .hasMessageContaining("2");
+
+        verify(transferenciaPendenteRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmarTransferencia_deveConfirmar_quandoOtpValidoENaoExpirado() {
+        //Arrange
+        Usuario usuarioOrigem = new Usuario("Ana Silva", "ana.silva@email.com");
+        ReflectionTestUtils.setField(usuarioOrigem, "id", 1L);
+        Conta contaOrigem = new Conta(usuarioOrigem, new BigDecimal("100.00"));
         ReflectionTestUtils.setField(contaOrigem, "id", 1L);
 
         Usuario usuarioDestino = new Usuario("Bruno Costa", "bruno.costa@email.com");
@@ -217,20 +259,148 @@ public class ContaServiceTest {
         Conta contaDestino = new Conta(usuarioDestino, BigDecimal.ZERO);
         ReflectionTestUtils.setField(contaDestino, "id", 2L);
 
-        TransferenciaRequest request = new TransferenciaRequest(1L, 2L, new BigDecimal("100.00"));
+        TransferenciaPendente pendente = new TransferenciaPendente(
+                contaOrigem, contaDestino, new BigDecimal("30.00"), "hash-123456", Instant.now().plusSeconds(300)
+        );
+        ReflectionTestUtils.setField(pendente, "id", 50L);
 
-        when(contaRepository.findById(1L)).thenReturn(Optional.of(contaOrigem));
-        when(contaRepository.findById(2L)).thenReturn(Optional.of(contaDestino));
+        ConfirmarOtpRequest request = new ConfirmarOtpRequest("123456");
+
+        when(transferenciaPendenteRepository.findById(50L)).thenReturn(Optional.of(pendente));
+        when(otpService.isCodigoValido("123456", "hash-123456")).thenReturn(true);
+
+        //Act
+        TransacaoResponse response = contaService.confirmarTransferencia(50L, request);
+
+        //Assert
+        assertThat(contaOrigem.getSaldo()).isEqualByComparingTo("70.00");
+        assertThat(contaDestino.getSaldo()).isEqualByComparingTo("30.00");
+        assertThat(pendente.isConfirmada()).isTrue();
+        assertThat(response.tipo()).isEqualTo(TransacaoResponse.TipoMovimento.SAIDA);
+        assertThat(response.valor()).isEqualByComparingTo("30.00");
+
+        verify(contaRepository).save(contaOrigem);
+        verify(contaRepository).save(contaDestino);
+        verify(transacaoRepository).save(any(Transacao.class));
+        verify(transferenciaPendenteRepository).save(pendente);
+    }
+
+    @Test
+    void confirmarTransferencia_deveLancarExcecao_quandoPendenteNaoExiste() {
+        //Arrange
+        ConfirmarOtpRequest request = new ConfirmarOtpRequest("123456");
+
+        when(transferenciaPendenteRepository.findById(99L)).thenReturn(Optional.empty());
 
         //Act + Assert
-        assertThatThrownBy(() -> contaService.transferir(request))
-                .isInstanceOf(SaldoInsuficienteException.class);
-
-        assertThat(contaOrigem.getSaldo()).isEqualByComparingTo("10.00");
-        assertThat(contaDestino.getSaldo()).isEqualByComparingTo("0.00");
+        assertThatThrownBy(() -> contaService.confirmarTransferencia(99L, request))
+                .isInstanceOf(RecursoNaoEncontradoException.class)
+                .hasMessageContaining("99");
 
         verify(contaRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmarTransferencia_deveLancarExcecao_quandoJaConfirmada() {
+        //Arrange
+        Usuario usuarioOrigem = new Usuario("Ana Silva", "ana.silva@email.com");
+        Conta contaOrigem = new Conta(usuarioOrigem, new BigDecimal("100.00"));
+
+        Usuario usuarioDestino = new Usuario("Bruno Costa", "bruno.costa@email.com");
+        Conta contaDestino = new Conta(usuarioDestino, BigDecimal.ZERO);
+
+        TransferenciaPendente pendente = new TransferenciaPendente(
+                contaOrigem, contaDestino, new BigDecimal("30.00"), "hash-123456", Instant.now().plusSeconds(300)
+        );
+        pendente.confirmar();
+
+        ConfirmarOtpRequest request = new ConfirmarOtpRequest("123456");
+
+        when(transferenciaPendenteRepository.findById(50L)).thenReturn(Optional.of(pendente));
+
+        //Act + Assert
+        assertThatThrownBy(() -> contaService.confirmarTransferencia(50L, request))
+                .isInstanceOf(OtpInvalidoException.class)
+                .hasMessage("Transferência já foi confirmada");
+
+        verify(contaRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmarTransferencia_deveLancarExcecao_quandoOtpExpirado() {
+        //Arrange
+        Usuario usuarioOrigem = new Usuario("Ana Silva", "ana.silva@email.com");
+        Conta contaOrigem = new Conta(usuarioOrigem, new BigDecimal("100.00"));
+
+        Usuario usuarioDestino = new Usuario("Bruno Costa", "bruno.costa@email.com");
+        Conta contaDestino = new Conta(usuarioDestino, BigDecimal.ZERO);
+
+        TransferenciaPendente pendente = new TransferenciaPendente(
+                contaOrigem, contaDestino, new BigDecimal("30.00"), "hash-123456", Instant.now().minusSeconds(1)
+        );
+
+        ConfirmarOtpRequest request = new ConfirmarOtpRequest("123456");
+
+        when(transferenciaPendenteRepository.findById(50L)).thenReturn(Optional.of(pendente));
+
+        //Act + Assert
+        assertThatThrownBy(() -> contaService.confirmarTransferencia(50L, request))
+                .isInstanceOf(OtpInvalidoException.class)
+                .hasMessage("Código OTP expirado");
+
+        verify(contaRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmarTransferencia_deveLancarExcecao_quandoCodigoOtpInvalido() {
+        //Arrange
+        Usuario usuarioOrigem = new Usuario("Ana Silva", "ana.silva@email.com");
+        Conta contaOrigem = new Conta(usuarioOrigem, new BigDecimal("100.00"));
+
+        Usuario usuarioDestino = new Usuario("Bruno Costa", "bruno.costa@email.com");
+        Conta contaDestino = new Conta(usuarioDestino, BigDecimal.ZERO);
+
+        TransferenciaPendente pendente = new TransferenciaPendente(
+                contaOrigem, contaDestino, new BigDecimal("30.00"), "hash-123456", Instant.now().plusSeconds(300)
+        );
+
+        ConfirmarOtpRequest request = new ConfirmarOtpRequest("000000");
+
+        when(transferenciaPendenteRepository.findById(50L)).thenReturn(Optional.of(pendente));
+        when(otpService.isCodigoValido("000000", "hash-123456")).thenReturn(false);
+
+        //Act + Assert
+        assertThatThrownBy(() -> contaService.confirmarTransferencia(50L, request))
+                .isInstanceOf(OtpInvalidoException.class)
+                .hasMessage("Código OTP inválido");
+
+        verify(contaRepository, never()).save(any());
+    }
+
+    @Test
+    void confirmarTransferencia_deveLancarExcecao_quandoSaldoInsuficiente() {
+        //Arrange
+        Usuario usuarioOrigem = new Usuario("Ana Silva", "ana.silva@email.com");
+        Conta contaOrigem = new Conta(usuarioOrigem, new BigDecimal("10.00"));
+
+        Usuario usuarioDestino = new Usuario("Bruno Costa", "bruno.costa@email.com");
+        Conta contaDestino = new Conta(usuarioDestino, BigDecimal.ZERO);
+
+        TransferenciaPendente pendente = new TransferenciaPendente(
+                contaOrigem, contaDestino, new BigDecimal("100.00"), "hash-123456", Instant.now().plusSeconds(300)
+        );
+
+        ConfirmarOtpRequest request = new ConfirmarOtpRequest("123456");
+
+        when(transferenciaPendenteRepository.findById(50L)).thenReturn(Optional.of(pendente));
+        when(otpService.isCodigoValido("123456", "hash-123456")).thenReturn(true);
+
+        //Act + Assert
+        assertThatThrownBy(() -> contaService.confirmarTransferencia(50L, request))
+                .isInstanceOf(SaldoInsuficienteException.class);
+
         verify(transacaoRepository, never()).save(any());
+        verify(transferenciaPendenteRepository, never()).save(any());
     }
 
     @Test

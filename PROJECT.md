@@ -60,7 +60,7 @@ Esse domínio é proposital: força BigDecimal, concorrência, idempotência e c
 
 ---
 
-## Fase 2 — Segurança: JWT, refresh token e 2FA
+## Fase 2 — Segurança: JWT, refresh token e 2FA ✅ CONCLUÍDA
 
 **Objetivo:** proteger a API com autenticação stateless e confirmar transferências com OTP.
 
@@ -83,10 +83,33 @@ Esse domínio é proposital: força BigDecimal, concorrência, idempotência e c
 - Proteção contra replay attack no endpoint de transferência
 
 **Critério de pronto:**
-- Endpoints protegidos exigem token válido
-- Refresh token renova o access token
-- Transferência só é confirmada após validação do OTP
-- Onde fica o estado intermediário do login com 2FA está documentado
+- [x] Endpoints protegidos exigem token válido
+- [x] Refresh token renova o access token (com rotação: o token antigo é revogado a cada uso)
+- [x] Transferência só é confirmada após validação do OTP
+- [x] Onde fica o estado intermediário do login com 2FA está documentado
+
+**Estado intermediário do fluxo de 2FA (transferência):**
+A confirmação por OTP é modelada como uma entidade própria, `TransferenciaPendente`
+(`entity/TransferenciaPendente.java`), separada do `Transacao` (ledger append-only):
+
+1. `POST /contas/transferencias` cria um `TransferenciaPendente` (status "pendente",
+   com hash do código OTP e prazo de expiração) e responde `202 Accepted`.
+2. `POST /contas/transferencias/{id}/confirmar` valida o OTP. Só **neste momento**
+   o saldo é verificado/debitado/creditado e um `Transacao` é gravado no ledger.
+3. Replay é bloqueado pela flag `confirmada` (uso único) e pelo `expiraEm` (TTL).
+
+Essa separação evita que uma transferência "talvez nunca confirmada" vire um
+registro permanente no ledger, e adia a validação de saldo para o momento da
+confirmação (mitigando TOCTOU entre os dois passos).
+
+**Gaps conhecidos / débitos técnicos (para revisitar em fases futuras):**
+- Requisições não autenticadas a endpoints protegidos retornam `403 Forbidden`
+  em vez do semanticamente correto `401 Unauthorized` — comportamento padrão do
+  Spring Security para APIs stateless. Corrigir exigiria um `AuthenticationEntryPoint`
+  customizado.
+- `POST /contas` (criação de conta) não tem `@PreAuthorize` e recebe `usuarioId`
+  no corpo da requisição — um vetor de BOLA (OWASP API1:2023) ainda não corrigido.
+  O ideal seria derivar o usuário do principal autenticado em vez de aceitá-lo no payload.
 
 ---
 
