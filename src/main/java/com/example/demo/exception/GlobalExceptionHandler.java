@@ -90,4 +90,9 @@ public class GlobalExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "Você não tem permissão para acessar este recurso");
     }
 
+    @ExceptionHandler(ChaveIdempotenciaConflitanteException.class)
+    public ProblemDetail handleChaveIdempotenciaConflitante(ChaveIdempotenciaConflitanteException exception) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
 }
